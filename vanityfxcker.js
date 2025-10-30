@@ -3,13 +3,32 @@
 const http2 = require("http2");
 const WebSocket = require("ws");
 const fs = require("fs").promises;
+const dns = require("dns");
+const { exec } = require("child_process");
+
+dns.setDefaultResultOrder("ipv4first");
+
+
+try {
+  if (process.platform === "win32") {
+    exec(`wmic process where processid="${process.pid}" CALL setpriority "high priority"`, (error) => {
+      if (error) {
+        console.error("priority error:", error.message);
+      } else {
+        console.log("highpriority");
+      }
+    });
+  }
+} catch (error) {
+  console.error("Priority set error:", error.message);
+}
 
 let mfaToken = null;
 
 const client = http2.connect('https://canary.discord.com');
-const token = "SELF TOKEN";
-const targetGuildId = "URLNIN CEKILCEGI SV";
-const channelId = "LOG KANALI";
+const token = "token";
+const targetGuildId = "1417604824467509439";
+const channelId = "1433260392443941005";
 const guilds = {};
 let vanity;
 
@@ -99,6 +118,21 @@ setInterval(() => {
   readMFAToken();
 }, 10000);
 
+
+setInterval(() => {
+  if (client.destroyed) {
+    console.log("http2 client res");
+    process.exit();
+  }
+  const req = client.request({
+    ':method': 'HEAD',
+    ':path': '/api/users/@me',
+    'authorization': token,
+  });
+  req.on('error', () => {});
+  req.end();
+}, 2000);
+
 const websocket = new WebSocket("wss://gateway.discord.gg/");
 
 websocket.onclose = (event) => {
@@ -145,12 +179,18 @@ websocket.onmessage = async (message) => {
       },
     }));
 
-    setInterval(() => websocket.send(JSON.stringify({ 
-      op: 1, 
-      d: {}, 
-      s: null, 
-      t: "heartbeat" 
-    })), d.heartbeat_interval);
+    setTimeout(() => {
+      setInterval(() => {
+        if (websocket.readyState === 1) {
+          websocket.send(JSON.stringify({ 
+            op: 1, 
+            d: {}, 
+            s: null, 
+            t: "heartbeat" 
+          }));
+        }
+      }, d.heartbeat_interval);
+    }, d.heartbeat_interval * Math.random());
   } else if (op === 7) {
     process.exit();
   }
